@@ -11,6 +11,12 @@ function App() {
     deleteSelectedObject,
     bringToFront,
     sendToBack,
+    alignLeft,
+    alignCenterH,
+    alignRight,
+    alignTop,
+    alignCenterV,
+    alignBottom,
     canvasWidth,
     canvasHeight,
     updateKey,
@@ -23,6 +29,12 @@ function App() {
         onDeleteSelected={deleteSelectedObject}
         onBringToFront={bringToFront}
         onSendToBack={sendToBack}
+        onAlignLeft={alignLeft}
+        onAlignCenterH={alignCenterH}
+        onAlignRight={alignRight}
+        onAlignTop={alignTop}
+        onAlignCenterV={alignCenterV}
+        onAlignBottom={alignBottom}
         hasSelection={!!selectedObject}
       />
       <div className="flex flex-1 overflow-hidden">

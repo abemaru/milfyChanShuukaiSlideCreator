@@ -107,6 +107,63 @@ export const useFabricCanvas = () => {
     }
   }, [canvas, selectedObject]);
 
+  // 整列機能
+  const alignLeft = useCallback(() => {
+    if (canvas && selectedObject) {
+      const bound = selectedObject.getBoundingRect();
+      selectedObject.set('left', selectedObject.left! - bound.left);
+      selectedObject.setCoords();
+      canvas.renderAll();
+    }
+  }, [canvas, selectedObject]);
+
+  const alignCenterH = useCallback(() => {
+    if (canvas && selectedObject) {
+      const bound = selectedObject.getBoundingRect();
+      const centerX = CANVAS_WIDTH / 2;
+      selectedObject.set('left', selectedObject.left! + (centerX - (bound.left + bound.width / 2)));
+      selectedObject.setCoords();
+      canvas.renderAll();
+    }
+  }, [canvas, selectedObject]);
+
+  const alignRight = useCallback(() => {
+    if (canvas && selectedObject) {
+      const bound = selectedObject.getBoundingRect();
+      selectedObject.set('left', selectedObject.left! + (CANVAS_WIDTH - (bound.left + bound.width)));
+      selectedObject.setCoords();
+      canvas.renderAll();
+    }
+  }, [canvas, selectedObject]);
+
+  const alignTop = useCallback(() => {
+    if (canvas && selectedObject) {
+      const bound = selectedObject.getBoundingRect();
+      selectedObject.set('top', selectedObject.top! - bound.top);
+      selectedObject.setCoords();
+      canvas.renderAll();
+    }
+  }, [canvas, selectedObject]);
+
+  const alignCenterV = useCallback(() => {
+    if (canvas && selectedObject) {
+      const bound = selectedObject.getBoundingRect();
+      const centerY = CANVAS_HEIGHT / 2;
+      selectedObject.set('top', selectedObject.top! + (centerY - (bound.top + bound.height / 2)));
+      selectedObject.setCoords();
+      canvas.renderAll();
+    }
+  }, [canvas, selectedObject]);
+
+  const alignBottom = useCallback(() => {
+    if (canvas && selectedObject) {
+      const bound = selectedObject.getBoundingRect();
+      selectedObject.set('top', selectedObject.top! + (CANVAS_HEIGHT - (bound.top + bound.height)));
+      selectedObject.setCoords();
+      canvas.renderAll();
+    }
+  }, [canvas, selectedObject]);
+
   return {
     canvas,
     canvasRef,
@@ -115,6 +172,12 @@ export const useFabricCanvas = () => {
     deleteSelectedObject,
     bringToFront,
     sendToBack,
+    alignLeft,
+    alignCenterH,
+    alignRight,
+    alignTop,
+    alignCenterV,
+    alignBottom,
     canvasWidth: CANVAS_WIDTH,
     canvasHeight: CANVAS_HEIGHT,
     updateKey,
