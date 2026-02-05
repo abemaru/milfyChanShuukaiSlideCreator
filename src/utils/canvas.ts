@@ -142,7 +142,7 @@ export const addTextToCanvas = (canvas: fabric.Canvas): void => {
     top: canvas.height! / 2 - 25,
     fontSize: 48,
     fill: '#000000',
-    fontFamily: 'Arial, sans-serif',
+    fontFamily: 'LightNovelPOP, sans-serif',
     fontWeight: 'normal',
     textAlign: 'left',
   });
