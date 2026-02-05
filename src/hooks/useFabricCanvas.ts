@@ -20,6 +20,8 @@ export const useFabricCanvas = () => {
       backgroundColor: '#ffffff',
       selection: true,
       preserveObjectStacking: true,
+      // Shift または Ctrl で複数選択可能にする
+      selectionKey: ['shiftKey', 'ctrlKey'],
     });
 
     // 背景画像の設定（Viteのベースパスを考慮）
