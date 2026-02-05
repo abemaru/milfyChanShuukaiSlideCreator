@@ -42,6 +42,10 @@ export const addImageToCanvas = (
             // フチの初期設定（なし）
             stroke: undefined,
             strokeWidth: 0,
+            // スケーリングに関係なくストローク幅を一定に
+            strokeUniform: true,
+            // ストロークを塗りの上に描画
+            paintFirst: 'fill',
           });
 
           // 最小サイズの設定
@@ -110,10 +114,14 @@ export const updateImageProperty = (
       object.set('angle', value as number);
     } else if (property === 'strokeWidth') {
       object.set('strokeWidth', value as number);
+      // スケーリングに関係なくストローク幅を一定に
+      object.set('strokeUniform', true);
       // ストローク幅が0より大きい場合、デフォルトの色を設定
       if ((value as number) > 0 && !object.stroke) {
         object.set('stroke', '#000000');
       }
+      // 境界の再計算
+      object.setCoords();
     } else if (property === 'stroke') {
       object.set('stroke', value as string | undefined);
     }
