@@ -93,6 +93,7 @@ export const updateTextProperty = (
   if (object instanceof fabric.IText) {
     object.set(property as keyof fabric.IText, value);
     canvas.renderAll();
+    canvas.fire('object:modified', { target: object });
   }
 };
 
@@ -117,6 +118,7 @@ export const updateImageProperty = (
       object.set('stroke', value as string | undefined);
     }
     canvas.renderAll();
+    canvas.fire('object:modified', { target: object });
   }
 };
 

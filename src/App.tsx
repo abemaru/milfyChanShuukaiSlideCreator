@@ -13,6 +13,7 @@ function App() {
     sendToBack,
     canvasWidth,
     canvasHeight,
+    updateKey,
   } = useFabricCanvas();
 
   return (
@@ -25,7 +26,7 @@ function App() {
         hasSelection={!!selectedObject}
       />
       <div className="flex flex-1 overflow-hidden">
-        <PropertyPanel canvas={canvas} selectedObject={selectedObject} />
+        <PropertyPanel key={updateKey} canvas={canvas} selectedObject={selectedObject} />
         <Canvas
           canvasRef={canvasRef}
           canvasWidth={canvasWidth}

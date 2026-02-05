@@ -8,6 +8,7 @@ export const useFabricCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [canvas, setCanvas] = useState<fabric.Canvas | null>(null);
   const [selectedObject, setSelectedObject] = useState<fabric.Object | null>(null);
+  const [updateKey, setUpdateKey] = useState(0);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -54,6 +55,7 @@ export const useFabricCanvas = () => {
     // オブジェクト変更時の再レンダリング
     fabricCanvas.on('object:modified', () => {
       setSelectedObject(fabricCanvas.getActiveObject());
+      setUpdateKey((k) => k + 1);
     });
 
     setCanvas(fabricCanvas);
@@ -115,5 +117,6 @@ export const useFabricCanvas = () => {
     sendToBack,
     canvasWidth: CANVAS_WIDTH,
     canvasHeight: CANVAS_HEIGHT,
+    updateKey,
   };
 };
