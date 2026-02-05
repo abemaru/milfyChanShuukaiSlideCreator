@@ -23,6 +23,8 @@ function App() {
     alignBottom,
     saveSlide,
     loadSlide,
+    undo,
+    redo,
     canvasWidth,
     canvasHeight,
     updateKey,
@@ -142,10 +144,15 @@ function App() {
         onAlignTop={alignTop}
         onAlignCenterV={alignCenterV}
         onAlignBottom={alignBottom}
+        onUndo={undo}
+        onRedo={redo}
         hasSelection={!!selectedObject}
         selectedCount={selectedCount}
         currentSlideIndex={currentSlideIndex}
         totalSlides={slides.length}
+        slides={slides}
+        saveCurrentSlide={saveSlide}
+        loadSlide={loadSlide}
       />
       <div className="flex flex-1 overflow-hidden">
         <PropertyPanel key={updateKey} canvas={canvas} selectedObject={selectedObject} />

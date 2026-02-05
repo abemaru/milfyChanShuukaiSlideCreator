@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import { fabric } from 'fabric';
 import { addImageToCanvas, addTextToCanvas } from '../utils/canvas';
-import { exportCanvas, ExportFormat } from '../utils/export';
 import { ErrorModal } from './ErrorModal';
+import { ExportModal } from './ExportModal';
+import { SlideData } from '../hooks/useSlides';
 
 interface ToolbarProps {
   canvas: fabric.Canvas | null;
@@ -15,10 +15,15 @@ interface ToolbarProps {
   onAlignTop: () => void;
   onAlignCenterV: () => void;
   onAlignBottom: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
   hasSelection: boolean;
   selectedCount: number;
   currentSlideIndex: number;
   totalSlides: number;
+  slides: SlideData[];
+  saveCurrentSlide: () => { json: string; thumbnail: string };
+  loadSlide: (json: string) => void;
 }
 
 export const Toolbar = ({
@@ -32,14 +37,19 @@ export const Toolbar = ({
   onAlignTop,
   onAlignCenterV,
   onAlignBottom,
+  onUndo,
+  onRedo,
   hasSelection,
   selectedCount,
   currentSlideIndex,
   totalSlides,
+  slides,
+  saveCurrentSlide,
+  loadSlide,
 }: ToolbarProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,12 +75,6 @@ export const Toolbar = ({
   const handleAddText = () => {
     if (!canvas) return;
     addTextToCanvas(canvas);
-  };
-
-  const handleExport = (format: ExportFormat) => {
-    if (!canvas) return;
-    exportCanvas(canvas, format);
-    setShowExportMenu(false);
   };
 
   return (
@@ -111,44 +115,34 @@ export const Toolbar = ({
             テキスト追加
           </button>
 
-          <div className="relative">
-            <button
-              onClick={() => setShowExportMenu(!showExportMenu)}
-              className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center gap-1"
-            >
-              エクスポート
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+          >
+            エクスポート
+          </button>
+        </div>
 
-            {showExportMenu && (
-              <div className="absolute top-full left-0 mt-1 bg-white shadow-lg rounded-lg overflow-hidden z-10">
-                <button
-                  onClick={() => handleExport('png')}
-                  className="block w-full px-4 py-2 text-left hover:bg-gray-100"
-                >
-                  PNG形式
-                </button>
-                <button
-                  onClick={() => handleExport('jpeg')}
-                  className="block w-full px-4 py-2 text-left hover:bg-gray-100"
-                >
-                  JPG形式
-                </button>
-              </div>
-            )}
-          </div>
+        {/* Undo/Redo */}
+        <div className="flex items-center gap-1 pl-4 border-l border-gray-300">
+          <button
+            onClick={onUndo}
+            className="p-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+            title="元に戻す (Ctrl+Z)"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+            </svg>
+          </button>
+          <button
+            onClick={onRedo}
+            className="p-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+            title="やり直し (Ctrl+Y)"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+            </svg>
+          </button>
         </div>
 
         {hasSelection && (
@@ -257,6 +251,17 @@ export const Toolbar = ({
       </div>
 
       {error && <ErrorModal message={error} onClose={() => setError(null)} />}
+
+      {showExportModal && (
+        <ExportModal
+          canvas={canvas}
+          slides={slides}
+          currentSlideIndex={currentSlideIndex}
+          onClose={() => setShowExportModal(false)}
+          saveCurrentSlide={saveCurrentSlide}
+          loadSlide={loadSlide}
+        />
+      )}
     </>
   );
 };

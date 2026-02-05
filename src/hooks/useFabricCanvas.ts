@@ -3,6 +3,7 @@ import { fabric } from 'fabric';
 
 const CANVAS_WIDTH = 1600;
 const CANVAS_HEIGHT = 900;
+const MAX_HISTORY_LENGTH = 50;
 
 export const useFabricCanvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -10,6 +11,11 @@ export const useFabricCanvas = () => {
   const [selectedObject, setSelectedObject] = useState<fabric.Object | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
   const [updateKey, setUpdateKey] = useState(0);
+
+  // Undo/Redo用の履歴管理
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef(-1);
+  const isUndoRedoRef = useRef(false);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -71,26 +77,142 @@ export const useFabricCanvas = () => {
 
     setCanvas(fabricCanvas);
 
+    // 初期状態を履歴に保存
+    setTimeout(() => {
+      const initialState = JSON.stringify(fabricCanvas.toJSON());
+      historyRef.current = [initialState];
+      historyIndexRef.current = 0;
+    }, 100);
+
     return () => {
       fabricCanvas.dispose();
     };
   }, []);
 
-  // Deleteキーでオブジェクト削除（テキスト編集中は除く）
+  // 履歴に状態を保存
+  const saveHistory = useCallback(() => {
+    if (!canvas || isUndoRedoRef.current) return;
+
+    const json = JSON.stringify(canvas.toJSON());
+
+    // 現在位置より後の履歴を削除
+    historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
+
+    // 新しい状態を追加
+    historyRef.current.push(json);
+
+    // 最大履歴数を超えた場合、古いものを削除
+    if (historyRef.current.length > MAX_HISTORY_LENGTH) {
+      historyRef.current.shift();
+    } else {
+      historyIndexRef.current++;
+    }
+  }, [canvas]);
+
+  // キャンバス変更時に履歴保存
+  useEffect(() => {
+    if (!canvas) return;
+
+    const handleObjectModified = () => {
+      saveHistory();
+    };
+
+    const handleObjectAdded = () => {
+      if (!isUndoRedoRef.current) {
+        saveHistory();
+      }
+    };
+
+    const handleObjectRemoved = () => {
+      if (!isUndoRedoRef.current) {
+        saveHistory();
+      }
+    };
+
+    canvas.on('object:modified', handleObjectModified);
+    canvas.on('object:added', handleObjectAdded);
+    canvas.on('object:removed', handleObjectRemoved);
+
+    return () => {
+      canvas.off('object:modified', handleObjectModified);
+      canvas.off('object:added', handleObjectAdded);
+      canvas.off('object:removed', handleObjectRemoved);
+    };
+  }, [canvas, saveHistory]);
+
+  // Undo
+  const undo = useCallback(() => {
+    if (!canvas || historyIndexRef.current <= 0) return;
+
+    isUndoRedoRef.current = true;
+    historyIndexRef.current--;
+
+    const json = historyRef.current[historyIndexRef.current];
+    const bgImage = canvas.backgroundImage;
+
+    canvas.loadFromJSON(JSON.parse(json), () => {
+      if (bgImage) {
+        canvas.setBackgroundImage(bgImage, canvas.renderAll.bind(canvas));
+      }
+      canvas.renderAll();
+      isUndoRedoRef.current = false;
+      setSelectedObject(null);
+      setSelectedCount(0);
+    });
+  }, [canvas]);
+
+  // Redo
+  const redo = useCallback(() => {
+    if (!canvas || historyIndexRef.current >= historyRef.current.length - 1) return;
+
+    isUndoRedoRef.current = true;
+    historyIndexRef.current++;
+
+    const json = historyRef.current[historyIndexRef.current];
+    const bgImage = canvas.backgroundImage;
+
+    canvas.loadFromJSON(JSON.parse(json), () => {
+      if (bgImage) {
+        canvas.setBackgroundImage(bgImage, canvas.renderAll.bind(canvas));
+      }
+      canvas.renderAll();
+      isUndoRedoRef.current = false;
+      setSelectedObject(null);
+      setSelectedCount(0);
+    });
+  }, [canvas]);
+
+  // キーボードショートカット
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Delete' && canvas && selectedObject) {
-        // テキスト編集中はオブジェクト削除しない
-        if (selectedObject instanceof fabric.IText && selectedObject.isEditing) {
-          return;
-        }
+      // テキスト編集中は一部ショートカットを無効化
+      const isTextEditing = selectedObject instanceof fabric.IText && selectedObject.isEditing;
+
+      // Delete: オブジェクト削除
+      if (e.key === 'Delete' && canvas && selectedObject && !isTextEditing) {
         deleteSelectedObject();
+        return;
+      }
+
+      // Ctrl+Z: Undo
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !isTextEditing) {
+        e.preventDefault();
+        undo();
+        return;
+      }
+
+      // Ctrl+Y or Ctrl+Shift+Z: Redo
+      if (((e.key === 'y' && (e.ctrlKey || e.metaKey)) ||
+           (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)) && !isTextEditing) {
+        e.preventDefault();
+        redo();
+        return;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canvas, selectedObject]);
+  }, [canvas, selectedObject, undo, redo]);
 
   const deleteSelectedObject = useCallback(() => {
     if (canvas && selectedObject) {
@@ -138,29 +260,58 @@ export const useFabricCanvas = () => {
     }
   }, [canvas, selectedObject]);
 
-  // ヘルパー関数：選択されたオブジェクトの配列を取得
-  const getSelectedObjects = useCallback((): fabric.Object[] => {
-    if (!selectedObject) return [];
+  // ヘルパー関数：複数選択のオブジェクトを取得し、ActiveSelectionを解除（座標を絶対座標に変換）
+  const getObjectsAndDiscardSelection = useCallback((): fabric.Object[] => {
+    if (!canvas || !selectedObject) return [];
+
     if (selectedObject.type === 'activeSelection') {
-      return (selectedObject as fabric.ActiveSelection).getObjects();
+      const activeSelection = selectedObject as fabric.ActiveSelection;
+      const objects = activeSelection.getObjects();
+
+      // ActiveSelectionを解除して各オブジェクトの座標を絶対座標に変換
+      canvas.discardActiveObject();
+      canvas.renderAll();
+
+      return objects;
     }
     return [selectedObject];
-  }, [selectedObject]);
+  }, [canvas, selectedObject]);
+
+  // ヘルパー関数：複数選択を再作成
+  const recreateActiveSelection = useCallback((objects: fabric.Object[]) => {
+    if (!canvas || objects.length <= 1) {
+      canvas?.renderAll();
+      return;
+    }
+
+    // 新しいActiveSelectionを作成
+    const newSelection = new fabric.ActiveSelection(objects, { canvas });
+    canvas.setActiveObject(newSelection);
+    canvas.requestRenderAll();
+
+    // 状態を更新
+    setSelectedObject(newSelection);
+    setSelectedCount(objects.length);
+  }, [canvas]);
 
   // 整列機能（単一選択：キャンバスに対して整列、複数選択：オブジェクト同士で整列）
   const alignLeft = useCallback(() => {
     if (!canvas || !selectedObject) return;
 
-    const objects = getSelectedObjects();
-    if (objects.length === 0) return;
+    const isMultiple = selectedObject.type === 'activeSelection';
 
-    if (objects.length === 1) {
+    if (!isMultiple) {
       // 単一選択：キャンバス左端に整列
-      const bound = objects[0].getBoundingRect();
-      objects[0].set('left', objects[0].left! - bound.left);
-      objects[0].setCoords();
+      const bound = selectedObject.getBoundingRect();
+      selectedObject.set('left', selectedObject.left! - bound.left);
+      selectedObject.setCoords();
+      canvas.renderAll();
     } else {
-      // 複数選択：最も左のオブジェクトに揃える
+      // 複数選択：先にActiveSelectionを解除して絶対座標に変換
+      const objects = getObjectsAndDiscardSelection();
+      if (objects.length === 0) return;
+
+      // 最も左のオブジェクトに揃える
       const bounds = objects.map(obj => obj.getBoundingRect());
       const minLeft = Math.min(...bounds.map(b => b.left));
 
@@ -169,24 +320,30 @@ export const useFabricCanvas = () => {
         obj.set('left', obj.left! - diff);
         obj.setCoords();
       });
+
+      // ActiveSelectionを再作成
+      recreateActiveSelection(objects);
     }
-    canvas.renderAll();
-  }, [canvas, selectedObject, getSelectedObjects]);
+  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection]);
 
   const alignCenterH = useCallback(() => {
     if (!canvas || !selectedObject) return;
 
-    const objects = getSelectedObjects();
-    if (objects.length === 0) return;
+    const isMultiple = selectedObject.type === 'activeSelection';
 
-    if (objects.length === 1) {
+    if (!isMultiple) {
       // 単一選択：キャンバス中央に整列
-      const bound = objects[0].getBoundingRect();
+      const bound = selectedObject.getBoundingRect();
       const centerX = CANVAS_WIDTH / 2;
-      objects[0].set('left', objects[0].left! + (centerX - (bound.left + bound.width / 2)));
-      objects[0].setCoords();
+      selectedObject.set('left', selectedObject.left! + (centerX - (bound.left + bound.width / 2)));
+      selectedObject.setCoords();
+      canvas.renderAll();
     } else {
-      // 複数選択：選択範囲の中央に揃える
+      // 複数選択：先にActiveSelectionを解除して絶対座標に変換
+      const objects = getObjectsAndDiscardSelection();
+      if (objects.length === 0) return;
+
+      // 選択範囲の中央に揃える
       const bounds = objects.map(obj => obj.getBoundingRect());
       const minLeft = Math.min(...bounds.map(b => b.left));
       const maxRight = Math.max(...bounds.map(b => b.left + b.width));
@@ -198,23 +355,29 @@ export const useFabricCanvas = () => {
         obj.set('left', obj.left! - diff);
         obj.setCoords();
       });
+
+      // ActiveSelectionを再作成
+      recreateActiveSelection(objects);
     }
-    canvas.renderAll();
-  }, [canvas, selectedObject, getSelectedObjects]);
+  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection]);
 
   const alignRight = useCallback(() => {
     if (!canvas || !selectedObject) return;
 
-    const objects = getSelectedObjects();
-    if (objects.length === 0) return;
+    const isMultiple = selectedObject.type === 'activeSelection';
 
-    if (objects.length === 1) {
+    if (!isMultiple) {
       // 単一選択：キャンバス右端に整列
-      const bound = objects[0].getBoundingRect();
-      objects[0].set('left', objects[0].left! + (CANVAS_WIDTH - (bound.left + bound.width)));
-      objects[0].setCoords();
+      const bound = selectedObject.getBoundingRect();
+      selectedObject.set('left', selectedObject.left! + (CANVAS_WIDTH - (bound.left + bound.width)));
+      selectedObject.setCoords();
+      canvas.renderAll();
     } else {
-      // 複数選択：最も右のオブジェクトに揃える
+      // 複数選択：先にActiveSelectionを解除して絶対座標に変換
+      const objects = getObjectsAndDiscardSelection();
+      if (objects.length === 0) return;
+
+      // 最も右のオブジェクトに揃える
       const bounds = objects.map(obj => obj.getBoundingRect());
       const maxRight = Math.max(...bounds.map(b => b.left + b.width));
 
@@ -224,23 +387,29 @@ export const useFabricCanvas = () => {
         obj.set('left', obj.left! + diff);
         obj.setCoords();
       });
+
+      // ActiveSelectionを再作成
+      recreateActiveSelection(objects);
     }
-    canvas.renderAll();
-  }, [canvas, selectedObject, getSelectedObjects]);
+  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection]);
 
   const alignTop = useCallback(() => {
     if (!canvas || !selectedObject) return;
 
-    const objects = getSelectedObjects();
-    if (objects.length === 0) return;
+    const isMultiple = selectedObject.type === 'activeSelection';
 
-    if (objects.length === 1) {
+    if (!isMultiple) {
       // 単一選択：キャンバス上端に整列
-      const bound = objects[0].getBoundingRect();
-      objects[0].set('top', objects[0].top! - bound.top);
-      objects[0].setCoords();
+      const bound = selectedObject.getBoundingRect();
+      selectedObject.set('top', selectedObject.top! - bound.top);
+      selectedObject.setCoords();
+      canvas.renderAll();
     } else {
-      // 複数選択：最も上のオブジェクトに揃える
+      // 複数選択：先にActiveSelectionを解除して絶対座標に変換
+      const objects = getObjectsAndDiscardSelection();
+      if (objects.length === 0) return;
+
+      // 最も上のオブジェクトに揃える
       const bounds = objects.map(obj => obj.getBoundingRect());
       const minTop = Math.min(...bounds.map(b => b.top));
 
@@ -249,24 +418,30 @@ export const useFabricCanvas = () => {
         obj.set('top', obj.top! - diff);
         obj.setCoords();
       });
+
+      // ActiveSelectionを再作成
+      recreateActiveSelection(objects);
     }
-    canvas.renderAll();
-  }, [canvas, selectedObject, getSelectedObjects]);
+  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection]);
 
   const alignCenterV = useCallback(() => {
     if (!canvas || !selectedObject) return;
 
-    const objects = getSelectedObjects();
-    if (objects.length === 0) return;
+    const isMultiple = selectedObject.type === 'activeSelection';
 
-    if (objects.length === 1) {
+    if (!isMultiple) {
       // 単一選択：キャンバス中央に整列
-      const bound = objects[0].getBoundingRect();
+      const bound = selectedObject.getBoundingRect();
       const centerY = CANVAS_HEIGHT / 2;
-      objects[0].set('top', objects[0].top! + (centerY - (bound.top + bound.height / 2)));
-      objects[0].setCoords();
+      selectedObject.set('top', selectedObject.top! + (centerY - (bound.top + bound.height / 2)));
+      selectedObject.setCoords();
+      canvas.renderAll();
     } else {
-      // 複数選択：選択範囲の中央に揃える
+      // 複数選択：先にActiveSelectionを解除して絶対座標に変換
+      const objects = getObjectsAndDiscardSelection();
+      if (objects.length === 0) return;
+
+      // 選択範囲の中央に揃える
       const bounds = objects.map(obj => obj.getBoundingRect());
       const minTop = Math.min(...bounds.map(b => b.top));
       const maxBottom = Math.max(...bounds.map(b => b.top + b.height));
@@ -278,23 +453,29 @@ export const useFabricCanvas = () => {
         obj.set('top', obj.top! - diff);
         obj.setCoords();
       });
+
+      // ActiveSelectionを再作成
+      recreateActiveSelection(objects);
     }
-    canvas.renderAll();
-  }, [canvas, selectedObject, getSelectedObjects]);
+  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection]);
 
   const alignBottom = useCallback(() => {
     if (!canvas || !selectedObject) return;
 
-    const objects = getSelectedObjects();
-    if (objects.length === 0) return;
+    const isMultiple = selectedObject.type === 'activeSelection';
 
-    if (objects.length === 1) {
+    if (!isMultiple) {
       // 単一選択：キャンバス下端に整列
-      const bound = objects[0].getBoundingRect();
-      objects[0].set('top', objects[0].top! + (CANVAS_HEIGHT - (bound.top + bound.height)));
-      objects[0].setCoords();
+      const bound = selectedObject.getBoundingRect();
+      selectedObject.set('top', selectedObject.top! + (CANVAS_HEIGHT - (bound.top + bound.height)));
+      selectedObject.setCoords();
+      canvas.renderAll();
     } else {
-      // 複数選択：最も下のオブジェクトに揃える
+      // 複数選択：先にActiveSelectionを解除して絶対座標に変換
+      const objects = getObjectsAndDiscardSelection();
+      if (objects.length === 0) return;
+
+      // 最も下のオブジェクトに揃える
       const bounds = objects.map(obj => obj.getBoundingRect());
       const maxBottom = Math.max(...bounds.map(b => b.top + b.height));
 
@@ -304,15 +485,26 @@ export const useFabricCanvas = () => {
         obj.set('top', obj.top! + diff);
         obj.setCoords();
       });
+
+      // ActiveSelectionを再作成
+      recreateActiveSelection(objects);
     }
-    canvas.renderAll();
-  }, [canvas, selectedObject, getSelectedObjects]);
+  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection]);
 
   // スライドの保存（JSONとサムネイルを返す）
   const saveSlide = useCallback((): { json: string; thumbnail: string } => {
     if (!canvas) return { json: '', thumbnail: '' };
 
-    // 選択を解除してからエクスポート
+    // 現在の選択状態を保存
+    const activeObject = canvas.getActiveObject();
+    let selectedObjects: fabric.Object[] = [];
+
+    // ActiveSelectionの場合はオブジェクトを保存
+    if (activeObject && activeObject.type === 'activeSelection') {
+      selectedObjects = (activeObject as fabric.ActiveSelection).getObjects();
+    }
+
+    // 選択を解除してからエクスポート（サムネイルに選択枠が入らないように）
     canvas.discardActiveObject();
     canvas.renderAll();
 
@@ -322,6 +514,19 @@ export const useFabricCanvas = () => {
       multiplier: 0.1, // サムネイル用に10%サイズ
     });
 
+    // 選択状態を復元
+    if (activeObject) {
+      if (selectedObjects.length > 1) {
+        // 複数選択の場合は新しいActiveSelectionを作成
+        const newSelection = new fabric.ActiveSelection(selectedObjects, { canvas });
+        canvas.setActiveObject(newSelection);
+      } else {
+        // 単一選択の場合はそのまま復元
+        canvas.setActiveObject(activeObject);
+      }
+      canvas.renderAll();
+    }
+
     return { json, thumbnail };
   }, [canvas]);
 
@@ -329,6 +534,8 @@ export const useFabricCanvas = () => {
   const loadSlide = useCallback(
     (json: string) => {
       if (!canvas) return;
+
+      isUndoRedoRef.current = true;
 
       // キャンバスをクリア（背景画像は保持）
       const bgImage = canvas.backgroundImage;
@@ -359,6 +566,11 @@ export const useFabricCanvas = () => {
             });
           }
           canvas.renderAll();
+
+          // 履歴をリセット
+          historyRef.current = [JSON.stringify(canvas.toJSON())];
+          historyIndexRef.current = 0;
+          isUndoRedoRef.current = false;
         });
       } else {
         // 空のスライド：背景画像のみ再設定
@@ -376,6 +588,11 @@ export const useFabricCanvas = () => {
             originX: 'left',
             originY: 'top',
           });
+
+          // 履歴をリセット
+          historyRef.current = [JSON.stringify(canvas.toJSON())];
+          historyIndexRef.current = 0;
+          isUndoRedoRef.current = false;
         });
       }
 
@@ -415,6 +632,8 @@ export const useFabricCanvas = () => {
     saveSlide,
     loadSlide,
     clearCanvas,
+    undo,
+    redo,
     canvasWidth: CANVAS_WIDTH,
     canvasHeight: CANVAS_HEIGHT,
     updateKey,
