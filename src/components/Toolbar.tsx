@@ -16,6 +16,7 @@ interface ToolbarProps {
   onAlignCenterV: () => void;
   onAlignBottom: () => void;
   hasSelection: boolean;
+  selectedCount: number;
 }
 
 export const Toolbar = ({
@@ -30,6 +31,7 @@ export const Toolbar = ({
   onAlignCenterV,
   onAlignBottom,
   hasSelection,
+  selectedCount,
 }: ToolbarProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +146,13 @@ export const Toolbar = ({
 
         {hasSelection && (
           <>
+            {/* 選択数表示 */}
+            <div className="pl-4 border-l border-gray-300">
+              <span className="text-sm text-gray-600">
+                {selectedCount}個選択中
+              </span>
+            </div>
+
             {/* レイヤー操作 */}
             <div className="flex items-center gap-2 pl-4 border-l border-gray-300">
               <span className="text-xs text-gray-500">レイヤー:</span>

@@ -8,6 +8,7 @@ function App() {
     canvas,
     canvasRef,
     selectedObject,
+    selectedCount,
     deleteSelectedObject,
     bringToFront,
     sendToBack,
@@ -36,6 +37,7 @@ function App() {
         onAlignCenterV={alignCenterV}
         onAlignBottom={alignBottom}
         hasSelection={!!selectedObject}
+        selectedCount={selectedCount}
       />
       <div className="flex flex-1 overflow-hidden">
         <PropertyPanel key={updateKey} canvas={canvas} selectedObject={selectedObject} />
