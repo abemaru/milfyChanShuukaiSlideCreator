@@ -6,6 +6,55 @@ interface PropertyPanelProps {
   selectedObject: fabric.Object | null;
 }
 
+// カラーコードのバリデーション
+const isValidColor = (color: string): boolean => {
+  return /^#[0-9A-Fa-f]{6}$/.test(color);
+};
+
+// カラー入力コンポーネント
+const ColorInput = ({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (color: string) => void;
+  disabled?: boolean;
+}) => {
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let input = e.target.value;
+    // #がなければ追加
+    if (!input.startsWith('#')) {
+      input = '#' + input;
+    }
+    // 有効なカラーコードの場合のみ適用
+    if (isValidColor(input)) {
+      onChange(input);
+    }
+  };
+
+  return (
+    <div className="flex gap-2">
+      <input
+        type="color"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-12 h-10 rounded cursor-pointer border"
+        disabled={disabled}
+      />
+      <input
+        type="text"
+        value={value}
+        onChange={handleTextChange}
+        placeholder="#000000"
+        className="flex-1 p-2 border rounded font-mono text-sm"
+        disabled={disabled}
+        maxLength={7}
+      />
+    </div>
+  );
+};
+
 export const PropertyPanel = ({ canvas, selectedObject }: PropertyPanelProps) => {
   if (!selectedObject || !canvas) {
     return (
@@ -66,13 +115,9 @@ export const PropertyPanel = ({ canvas, selectedObject }: PropertyPanelProps) =>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               フォントカラー
             </label>
-            <input
-              type="color"
+            <ColorInput
               value={(selectedObject as fabric.IText).fill?.toString() || '#000000'}
-              onChange={(e) =>
-                updateTextProperty(canvas, selectedObject, 'fill', e.target.value)
-              }
-              className="w-full h-10 rounded cursor-pointer"
+              onChange={(color) => updateTextProperty(canvas, selectedObject, 'fill', color)}
             />
           </div>
 
@@ -172,13 +217,9 @@ export const PropertyPanel = ({ canvas, selectedObject }: PropertyPanelProps) =>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 フチの色
               </label>
-              <input
-                type="color"
+              <ColorInput
                 value={(selectedObject as fabric.Image).stroke?.toString() || '#000000'}
-                onChange={(e) =>
-                  updateImageProperty(canvas, selectedObject, 'stroke', e.target.value)
-                }
-                className="w-full h-10 rounded cursor-pointer"
+                onChange={(color) => updateImageProperty(canvas, selectedObject, 'stroke', color)}
                 disabled={!((selectedObject as fabric.Image).strokeWidth)}
               />
               {!((selectedObject as fabric.Image).strokeWidth) && (
