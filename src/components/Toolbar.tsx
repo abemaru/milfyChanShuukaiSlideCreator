@@ -17,6 +17,8 @@ interface ToolbarProps {
   onAlignBottom: () => void;
   hasSelection: boolean;
   selectedCount: number;
+  currentSlideIndex: number;
+  totalSlides: number;
 }
 
 export const Toolbar = ({
@@ -32,6 +34,8 @@ export const Toolbar = ({
   onAlignBottom,
   hasSelection,
   selectedCount,
+  currentSlideIndex,
+  totalSlides,
 }: ToolbarProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,9 +76,12 @@ export const Toolbar = ({
   return (
     <>
       <div className="bg-white shadow-md px-4 py-3 flex items-center gap-4 flex-wrap">
-        <h1 className="text-lg font-bold text-gray-800 mr-4">
+        <h1 className="text-lg font-bold text-gray-800 mr-2">
           スライドエディター
         </h1>
+        <span className="text-sm text-gray-500 mr-4">
+          ({currentSlideIndex + 1}/{totalSlides})
+        </span>
 
         <div className="flex items-center gap-2">
           <input

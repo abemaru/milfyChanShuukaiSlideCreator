@@ -308,6 +308,95 @@ export const useFabricCanvas = () => {
     canvas.renderAll();
   }, [canvas, selectedObject, getSelectedObjects]);
 
+  // スライドの保存（JSONとサムネイルを返す）
+  const saveSlide = useCallback((): { json: string; thumbnail: string } => {
+    if (!canvas) return { json: '', thumbnail: '' };
+
+    // 選択を解除してからエクスポート
+    canvas.discardActiveObject();
+    canvas.renderAll();
+
+    const json = JSON.stringify(canvas.toJSON());
+    const thumbnail = canvas.toDataURL({
+      format: 'png',
+      multiplier: 0.1, // サムネイル用に10%サイズ
+    });
+
+    return { json, thumbnail };
+  }, [canvas]);
+
+  // スライドの読み込み
+  const loadSlide = useCallback(
+    (json: string) => {
+      if (!canvas) return;
+
+      // キャンバスをクリア（背景画像は保持）
+      const bgImage = canvas.backgroundImage;
+
+      canvas.clear();
+
+      if (json) {
+        canvas.loadFromJSON(JSON.parse(json), () => {
+          // 背景画像を再設定
+          if (bgImage) {
+            canvas.setBackgroundImage(bgImage, canvas.renderAll.bind(canvas));
+          } else {
+            // 背景画像を再読み込み
+            const backgroundUrl = `${import.meta.env.BASE_URL}background.png`;
+            fabric.Image.fromURL(backgroundUrl, (img) => {
+              if (!img.width || !img.height) {
+                canvas.setBackgroundColor('#e5e5e5', () => {
+                  canvas.renderAll();
+                });
+                return;
+              }
+              img.scaleToWidth(CANVAS_WIDTH);
+              img.scaleToHeight(CANVAS_HEIGHT);
+              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+                originX: 'left',
+                originY: 'top',
+              });
+            });
+          }
+          canvas.renderAll();
+        });
+      } else {
+        // 空のスライド：背景画像のみ再設定
+        const backgroundUrl = `${import.meta.env.BASE_URL}background.png`;
+        fabric.Image.fromURL(backgroundUrl, (img) => {
+          if (!img.width || !img.height) {
+            canvas.setBackgroundColor('#e5e5e5', () => {
+              canvas.renderAll();
+            });
+            return;
+          }
+          img.scaleToWidth(CANVAS_WIDTH);
+          img.scaleToHeight(CANVAS_HEIGHT);
+          canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+            originX: 'left',
+            originY: 'top',
+          });
+        });
+      }
+
+      setSelectedObject(null);
+      setSelectedCount(0);
+    },
+    [canvas]
+  );
+
+  // キャンバスをクリア（新規スライド用）
+  const clearCanvas = useCallback(() => {
+    if (!canvas) return;
+
+    const objects = canvas.getObjects();
+    objects.forEach((obj) => canvas.remove(obj));
+    canvas.discardActiveObject();
+    canvas.renderAll();
+    setSelectedObject(null);
+    setSelectedCount(0);
+  }, [canvas]);
+
   return {
     canvas,
     canvasRef,
@@ -323,6 +412,9 @@ export const useFabricCanvas = () => {
     alignTop,
     alignCenterV,
     alignBottom,
+    saveSlide,
+    loadSlide,
+    clearCanvas,
     canvasWidth: CANVAS_WIDTH,
     canvasHeight: CANVAS_HEIGHT,
     updateKey,
