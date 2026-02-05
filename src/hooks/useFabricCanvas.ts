@@ -63,10 +63,14 @@ export const useFabricCanvas = () => {
     };
   }, []);
 
-  // Deleteキーでオブジェクト削除
+  // Deleteキーでオブジェクト削除（テキスト編集中は除く）
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Delete' && canvas && selectedObject) {
+        // テキスト編集中はオブジェクト削除しない
+        if (selectedObject instanceof fabric.IText && selectedObject.isEditing) {
+          return;
+        }
         canvas.remove(selectedObject);
         canvas.discardActiveObject();
         canvas.renderAll();
