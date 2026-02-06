@@ -497,6 +497,20 @@ export const useFabricCanvas = () => {
 
     // 現在の選択状態を保存
     const activeObject = canvas.getActiveObject();
+
+    // テキスト編集中は選択解除しない（編集が中断されるため）
+    const isTextEditing = activeObject instanceof fabric.IText && activeObject.isEditing;
+
+    if (isTextEditing) {
+      // テキスト編集中はそのままJSONとサムネイルを取得
+      const json = JSON.stringify(canvas.toJSON());
+      const thumbnail = canvas.toDataURL({
+        format: 'png',
+        multiplier: 0.1,
+      });
+      return { json, thumbnail };
+    }
+
     let selectedObjects: fabric.Object[] = [];
 
     // ActiveSelectionの場合はオブジェクトを保存
