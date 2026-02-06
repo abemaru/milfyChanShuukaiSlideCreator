@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { fabric } from 'fabric';
 import { updateTextProperty, updateImageProperty, commitPropertyChange, AVAILABLE_FONTS } from '../utils/canvas';
 
@@ -23,21 +24,43 @@ const ColorInput = ({
   onCommit: () => void;
   disabled?: boolean;
 }) => {
+  // テキスト入力用のローカルstate（入力途中の値を保持）
+  const [textValue, setTextValue] = useState(value);
+
+  // 親のvalueが変わったらローカルstateも更新
+  useEffect(() => {
+    setTextValue(value);
+  }, [value]);
+
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let input = e.target.value;
+    let input = e.target.value.toUpperCase();
     // #がなければ追加
     if (!input.startsWith('#')) {
       input = '#' + input;
     }
-    // 有効なカラーコードの場合のみ適用
+    // 入力途中の値をローカルstateに保存
+    setTextValue(input);
+    // 有効なカラーコードの場合のみ親に通知
     if (isValidColor(input)) {
       onChange(input);
     }
   };
 
+  const handleBlur = () => {
+    // blur時に有効な値でなければ元に戻す
+    if (!isValidColor(textValue)) {
+      setTextValue(value);
+    }
+    onCommit();
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      onCommit();
+      if (isValidColor(textValue)) {
+        onCommit();
+      } else {
+        setTextValue(value);
+      }
     }
   };
 
@@ -53,9 +76,9 @@ const ColorInput = ({
       />
       <input
         type="text"
-        value={value}
+        value={textValue}
         onChange={handleTextChange}
-        onBlur={onCommit}
+        onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder="#000000"
         className="flex-1 p-2 border rounded font-mono text-sm"
