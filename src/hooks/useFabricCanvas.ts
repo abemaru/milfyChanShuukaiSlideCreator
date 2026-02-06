@@ -182,6 +182,24 @@ export const useFabricCanvas = () => {
     });
   }, [canvas]);
 
+  const deleteSelectedObject = useCallback(() => {
+    if (canvas && selectedObject) {
+      // 複数選択の場合
+      if (selectedObject.type === 'activeSelection') {
+        const activeSelection = selectedObject as fabric.ActiveSelection;
+        activeSelection.getObjects().forEach((obj) => {
+          canvas.remove(obj);
+        });
+      } else {
+        canvas.remove(selectedObject);
+      }
+      canvas.discardActiveObject();
+      canvas.renderAll();
+      setSelectedObject(null);
+      setSelectedCount(0);
+    }
+  }, [canvas, selectedObject]);
+
   // キーボードショートカット
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -212,25 +230,7 @@ export const useFabricCanvas = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canvas, selectedObject, undo, redo]);
-
-  const deleteSelectedObject = useCallback(() => {
-    if (canvas && selectedObject) {
-      // 複数選択の場合
-      if (selectedObject.type === 'activeSelection') {
-        const activeSelection = selectedObject as fabric.ActiveSelection;
-        activeSelection.getObjects().forEach((obj) => {
-          canvas.remove(obj);
-        });
-      } else {
-        canvas.remove(selectedObject);
-      }
-      canvas.discardActiveObject();
-      canvas.renderAll();
-      setSelectedObject(null);
-      setSelectedCount(0);
-    }
-  }, [canvas, selectedObject]);
+  }, [canvas, selectedObject, deleteSelectedObject, undo, redo]);
 
   const bringToFront = useCallback(() => {
     if (canvas && selectedObject) {
@@ -324,7 +324,8 @@ export const useFabricCanvas = () => {
       // ActiveSelectionを再作成
       recreateActiveSelection(objects);
     }
-  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection]);
+    saveHistory();
+  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection, saveHistory]);
 
   const alignCenterH = useCallback(() => {
     if (!canvas || !selectedObject) return;
@@ -359,7 +360,8 @@ export const useFabricCanvas = () => {
       // ActiveSelectionを再作成
       recreateActiveSelection(objects);
     }
-  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection]);
+    saveHistory();
+  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection, saveHistory]);
 
   const alignRight = useCallback(() => {
     if (!canvas || !selectedObject) return;
@@ -391,7 +393,8 @@ export const useFabricCanvas = () => {
       // ActiveSelectionを再作成
       recreateActiveSelection(objects);
     }
-  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection]);
+    saveHistory();
+  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection, saveHistory]);
 
   const alignTop = useCallback(() => {
     if (!canvas || !selectedObject) return;
@@ -422,7 +425,8 @@ export const useFabricCanvas = () => {
       // ActiveSelectionを再作成
       recreateActiveSelection(objects);
     }
-  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection]);
+    saveHistory();
+  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection, saveHistory]);
 
   const alignCenterV = useCallback(() => {
     if (!canvas || !selectedObject) return;
@@ -457,7 +461,8 @@ export const useFabricCanvas = () => {
       // ActiveSelectionを再作成
       recreateActiveSelection(objects);
     }
-  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection]);
+    saveHistory();
+  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection, saveHistory]);
 
   const alignBottom = useCallback(() => {
     if (!canvas || !selectedObject) return;
@@ -489,7 +494,8 @@ export const useFabricCanvas = () => {
       // ActiveSelectionを再作成
       recreateActiveSelection(objects);
     }
-  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection]);
+    saveHistory();
+  }, [canvas, selectedObject, getObjectsAndDiscardSelection, recreateActiveSelection, saveHistory]);
 
   // スライドの保存（JSONとサムネイルを返す）
   const saveSlide = useCallback((): { json: string; thumbnail: string } => {
@@ -569,14 +575,14 @@ export const useFabricCanvas = () => {
                 canvas.setBackgroundColor('#e5e5e5', () => {
                   canvas.renderAll();
                 });
-                return;
+              } else {
+                img.scaleToWidth(CANVAS_WIDTH);
+                img.scaleToHeight(CANVAS_HEIGHT);
+                canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+                  originX: 'left',
+                  originY: 'top',
+                });
               }
-              img.scaleToWidth(CANVAS_WIDTH);
-              img.scaleToHeight(CANVAS_HEIGHT);
-              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
-                originX: 'left',
-                originY: 'top',
-              });
             });
           }
           canvas.renderAll();
@@ -593,6 +599,10 @@ export const useFabricCanvas = () => {
           if (!img.width || !img.height) {
             canvas.setBackgroundColor('#e5e5e5', () => {
               canvas.renderAll();
+              // 履歴をリセット
+              historyRef.current = [JSON.stringify(canvas.toJSON())];
+              historyIndexRef.current = 0;
+              isUndoRedoRef.current = false;
             });
             return;
           }

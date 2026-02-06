@@ -38,6 +38,13 @@ export const ExportModal = ({
   const exportCurrentSlide = () => {
     if (!canvas) return;
 
+    // 選択状態を保存
+    const activeObject = canvas.getActiveObject();
+    let selectedObjects: fabric.Object[] = [];
+    if (activeObject && activeObject.type === 'activeSelection') {
+      selectedObjects = (activeObject as fabric.ActiveSelection).getObjects();
+    }
+
     canvas.discardActiveObject();
     canvas.renderAll();
 
@@ -46,6 +53,17 @@ export const ExportModal = ({
       quality: 1,
       multiplier: 1,
     });
+
+    // 選択状態を復元
+    if (activeObject) {
+      if (selectedObjects.length > 1) {
+        const newSelection = new fabric.ActiveSelection(selectedObjects, { canvas });
+        canvas.setActiveObject(newSelection);
+      } else {
+        canvas.setActiveObject(activeObject);
+      }
+      canvas.renderAll();
+    }
 
     const link = document.createElement('a');
     const extension = format === 'jpeg' ? 'jpg' : 'png';
@@ -68,6 +86,9 @@ export const ExportModal = ({
         i === currentSlideIndex ? { ...slide, json: currentData.json } : slide
       );
 
+      // 背景画像を保存
+      const bgImage = canvas.backgroundImage;
+
       const zip = new JSZip();
       const extension = format === 'jpeg' ? 'jpg' : 'png';
 
@@ -79,15 +100,30 @@ export const ExportModal = ({
         await new Promise<void>((resolve) => {
           if (slide.json) {
             canvas.loadFromJSON(JSON.parse(slide.json), () => {
-              canvas.renderAll();
-              // 少し待ってからキャプチャ
-              setTimeout(resolve, 100);
+              // 背景画像を再設定
+              if (bgImage) {
+                canvas.setBackgroundImage(bgImage, () => {
+                  canvas.renderAll();
+                  setTimeout(resolve, 100);
+                });
+              } else {
+                canvas.renderAll();
+                setTimeout(resolve, 100);
+              }
             });
           } else {
             // 空のスライドの場合はクリア
             canvas.clear();
-            canvas.renderAll();
-            setTimeout(resolve, 100);
+            // 背景画像を再設定
+            if (bgImage) {
+              canvas.setBackgroundImage(bgImage, () => {
+                canvas.renderAll();
+                setTimeout(resolve, 100);
+              });
+            } else {
+              canvas.renderAll();
+              setTimeout(resolve, 100);
+            }
           }
         });
 
