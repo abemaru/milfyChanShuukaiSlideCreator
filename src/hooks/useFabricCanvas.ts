@@ -69,12 +69,6 @@ export const useFabricCanvas = () => {
       setSelectedCount(0);
     });
 
-    // オブジェクト変更時の再レンダリング
-    fabricCanvas.on('object:modified', () => {
-      updateSelection();
-      setUpdateKey((k) => k + 1);
-    });
-
     setCanvas(fabricCanvas);
 
     // 初期状態を履歴に保存
@@ -109,11 +103,24 @@ export const useFabricCanvas = () => {
     }
   }, [canvas]);
 
-  // キャンバス変更時に履歴保存
+  // キャンバス変更時に履歴保存と状態更新
   useEffect(() => {
     if (!canvas) return;
 
     const handleObjectModified = () => {
+      // 選択状態とプロパティパネル更新
+      const activeObject = canvas.getActiveObject();
+      setSelectedObject(activeObject || null);
+      if (activeObject && activeObject.type === 'activeSelection') {
+        setSelectedCount((activeObject as fabric.ActiveSelection).getObjects().length);
+      } else if (activeObject) {
+        setSelectedCount(1);
+      } else {
+        setSelectedCount(0);
+      }
+      setUpdateKey((k) => k + 1);
+
+      // 履歴保存
       saveHistory();
     };
 

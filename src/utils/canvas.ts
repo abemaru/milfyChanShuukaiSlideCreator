@@ -156,12 +156,15 @@ export const updateTextProperty = (
   canvas: fabric.Canvas,
   object: fabric.Object,
   property: string,
-  value: string | number
+  value: string | number,
+  commit: boolean = true
 ): void => {
   if (object instanceof fabric.IText) {
     object.set(property as keyof fabric.IText, value);
     canvas.renderAll();
-    canvas.fire('object:modified', { target: object });
+    if (commit) {
+      canvas.fire('object:modified', { target: object });
+    }
   }
 };
 
@@ -169,7 +172,8 @@ export const updateImageProperty = (
   canvas: fabric.Canvas,
   object: fabric.Object,
   property: string,
-  value: number | string
+  value: number | string,
+  commit: boolean = true
 ): void => {
   if (object instanceof fabric.Image) {
     if (property === 'opacity') {
@@ -190,8 +194,18 @@ export const updateImageProperty = (
       object.set('stroke', value as string | undefined);
     }
     canvas.renderAll();
-    canvas.fire('object:modified', { target: object });
+    if (commit) {
+      canvas.fire('object:modified', { target: object });
+    }
   }
+};
+
+// 変更を確定して履歴に保存
+export const commitPropertyChange = (
+  canvas: fabric.Canvas,
+  object: fabric.Object
+): void => {
+  canvas.fire('object:modified', { target: object });
 };
 
 // 利用可能なフォントリスト

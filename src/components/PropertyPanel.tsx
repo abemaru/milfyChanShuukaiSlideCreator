@@ -1,5 +1,5 @@
 import { fabric } from 'fabric';
-import { updateTextProperty, updateImageProperty, AVAILABLE_FONTS } from '../utils/canvas';
+import { updateTextProperty, updateImageProperty, commitPropertyChange, AVAILABLE_FONTS } from '../utils/canvas';
 
 interface PropertyPanelProps {
   canvas: fabric.Canvas | null;
@@ -15,10 +15,12 @@ const isValidColor = (color: string): boolean => {
 const ColorInput = ({
   value,
   onChange,
+  onCommit,
   disabled = false,
 }: {
   value: string;
   onChange: (color: string) => void;
+  onCommit: () => void;
   disabled?: boolean;
 }) => {
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,12 +35,19 @@ const ColorInput = ({
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      onCommit();
+    }
+  };
+
   return (
     <div className="flex gap-2">
       <input
         type="color"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={onCommit}
         className="w-12 h-10 rounded cursor-pointer border"
         disabled={disabled}
       />
@@ -46,6 +55,8 @@ const ColorInput = ({
         type="text"
         value={value}
         onChange={handleTextChange}
+        onBlur={onCommit}
+        onKeyDown={handleKeyDown}
         placeholder="#000000"
         className="flex-1 p-2 border rounded font-mono text-sm"
         disabled={disabled}
@@ -105,8 +116,10 @@ export const PropertyPanel = ({ canvas, selectedObject }: PropertyPanelProps) =>
               max="200"
               value={(selectedObject as fabric.IText).fontSize || 48}
               onChange={(e) =>
-                updateTextProperty(canvas, selectedObject, 'fontSize', parseInt(e.target.value))
+                updateTextProperty(canvas, selectedObject, 'fontSize', parseInt(e.target.value), false)
               }
+              onMouseUp={() => commitPropertyChange(canvas, selectedObject)}
+              onTouchEnd={() => commitPropertyChange(canvas, selectedObject)}
               className="w-full"
             />
           </div>
@@ -117,7 +130,8 @@ export const PropertyPanel = ({ canvas, selectedObject }: PropertyPanelProps) =>
             </label>
             <ColorInput
               value={(selectedObject as fabric.IText).fill?.toString() || '#000000'}
-              onChange={(color) => updateTextProperty(canvas, selectedObject, 'fill', color)}
+              onChange={(color) => updateTextProperty(canvas, selectedObject, 'fill', color, false)}
+              onCommit={() => commitPropertyChange(canvas, selectedObject)}
             />
           </div>
 
@@ -172,8 +186,10 @@ export const PropertyPanel = ({ canvas, selectedObject }: PropertyPanelProps) =>
               max="100"
               value={Math.round(((selectedObject as fabric.Image).opacity || 1) * 100)}
               onChange={(e) =>
-                updateImageProperty(canvas, selectedObject, 'opacity', parseInt(e.target.value))
+                updateImageProperty(canvas, selectedObject, 'opacity', parseInt(e.target.value), false)
               }
+              onMouseUp={() => commitPropertyChange(canvas, selectedObject)}
+              onTouchEnd={() => commitPropertyChange(canvas, selectedObject)}
               className="w-full"
             />
           </div>
@@ -188,8 +204,10 @@ export const PropertyPanel = ({ canvas, selectedObject }: PropertyPanelProps) =>
               max="360"
               value={Math.round((selectedObject as fabric.Image).angle || 0)}
               onChange={(e) =>
-                updateImageProperty(canvas, selectedObject, 'angle', parseInt(e.target.value))
+                updateImageProperty(canvas, selectedObject, 'angle', parseInt(e.target.value), false)
               }
+              onMouseUp={() => commitPropertyChange(canvas, selectedObject)}
+              onTouchEnd={() => commitPropertyChange(canvas, selectedObject)}
               className="w-full"
             />
           </div>
@@ -207,8 +225,10 @@ export const PropertyPanel = ({ canvas, selectedObject }: PropertyPanelProps) =>
                 max="50"
                 value={(selectedObject as fabric.Image).strokeWidth || 0}
                 onChange={(e) =>
-                  updateImageProperty(canvas, selectedObject, 'strokeWidth', parseInt(e.target.value))
+                  updateImageProperty(canvas, selectedObject, 'strokeWidth', parseInt(e.target.value), false)
                 }
+                onMouseUp={() => commitPropertyChange(canvas, selectedObject)}
+                onTouchEnd={() => commitPropertyChange(canvas, selectedObject)}
                 className="w-full"
               />
             </div>
@@ -219,7 +239,8 @@ export const PropertyPanel = ({ canvas, selectedObject }: PropertyPanelProps) =>
               </label>
               <ColorInput
                 value={(selectedObject as fabric.Image).stroke?.toString() || '#000000'}
-                onChange={(color) => updateImageProperty(canvas, selectedObject, 'stroke', color)}
+                onChange={(color) => updateImageProperty(canvas, selectedObject, 'stroke', color, false)}
+                onCommit={() => commitPropertyChange(canvas, selectedObject)}
                 disabled={!((selectedObject as fabric.Image).strokeWidth)}
               />
               {!((selectedObject as fabric.Image).strokeWidth) && (
